@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>餐厅管理后台 - 会员画像查询</title>
+    <!-- 引入 Firebase 官方 SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    <style>
+        body { font-family: sans-serif; background: #f3f4f6; padding: 40px; }
+        .admin-card { background: white; padding: 30px; max-width: 600px; margin: 0 auto; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        h2 { color: #1f2937; margin-top: 0; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px; }
+        .search-box { display: flex; gap: 10px; margin: 20px 0; }
+        input { flex: 1; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 16px; }
+        button { padding: 10px 20px; background: #d97706; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; }
+        button:hover { background: #b45309; }
+        #result-box { margin-top: 20px; padding: 15px; background: #f9fafb; border-radius: 6px; border: 1px solid #e5e7eb; line-height: 1.8; }
+    </style>
+</head>
+<body>
+
+<div class="admin-card">
+    <h2>🔒 餐厅专属后台：智能会员画像查询 (实时云端版)</h2>
+    <p style="color: #6b7280; font-size: 14px;">请输入顾客的手机号码，查看其历史消费偏好与标签：</p>
+    
+    <div class="search-box">
+        <input type="text" id="phone-input" placeholder="例如：0123456789">
+        <button id="search-btn" onclick="queryMemberProfile()">立即查询</button>
+    </div>
+
+    <div id="result-box">
+        <span style="color: #9ca3af;">暂无查询结果，请输入手机号后点击查询。</span>
+    </div>
+</div>
+
+<script>
+    // ☁️ 初始化 Firebase 实时云数据库
+    const firebaseConfig = {
+        apiKey: "AIzaSyDShBrt-3CAAGQf4eP1T1zNf0q95MtGyPA",
+        authDomain: "restaurant-order-a8ed8.firebaseapp.com",
+        projectId: "restaurant-order-a8ed8",
+        storageBucket: "restaurant-order-a8ed8.firebasestorage.app",
+        messagingSenderId: "535128667185",
+        appId: "1:535128667185:web:6759dd6435d535d8349110"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    // ☁️ 升级为从 Firebase 实时云数据库查询
+    async function queryMemberProfile() {
+        let phone = document.getElementById('phone-input').value.trim();
+        let resultBox = document.getElementById('result-box');
+        
+        if (!phone) {
+            resultBox.innerHTML = `<span style="color: red;">请输入有效的手机号！</span>`;
+            return;
+        }
+
+        resultBox.innerHTML = `<span style="color: #d97706;">⏳ 正在从云端实时数据库查询中...</span>`;
+
+        try {
+            // 直接向云端 Firestore 发起查询请求
+            const docSnap = await db.collection('restaurant_members').doc(phone).get();
+
+            if (!docSnap.exists) {
+                resultBox.innerHTML = `<span style="color: #ef4444;">未找到手机号为 [${phone}] 的会员记录（可能该顾客还未下过单）。</span>`;
+                return;
+            }
+
+            let member = docSnap.data();
+
+            // 防错安全处理：确保数组属性存在
+            let tagsList = Array.isArray(member.tags) ? member.tags.join(' | ') : '暂无标签';
+            let topDishesList = Array.isArray(member.topDishes) && member.topDishes.length > 0 
+                                ? member.topDishes.join('、') 
+                                : '暂无数据';
+            let lastVisitTime = member.lastVisit 
+                                ? new Date(member.lastVisit).toLocaleString() 
+                                : '暂无记录';
+
+            // 格式化渲染会员画像
+            let html = `<b style="font-size: 16px; color: #1f2937;">📱 手机号：${member.phone}</b><br>`;
+            html += `🏷️ <b>会员标签：</b> <span style="color: #d97706; font-weight: bold;">${tagsList}</span><br>`;
+            html += `💰 <b>消费统计：</b> 总消费 RM ${member.totalSpent || 0} （共光临 ${member.totalOrders || 0} 次）<br>`;
+            html += `🏆 <b>TOP 3 最爱点：</b> ${topDishesList}<br>`;
+            html += `⏱️ <b>最后光临：</b> ${lastVisitTime}`;
+
+            resultBox.innerHTML = html;
+        } catch (error) {
+            console.error("云端查询失败:", error);
+            resultBox.innerHTML = `<span style="color: red;">查询失败，请检查网络或配置：${error.message}</span>`;
+        }
+    }
+</script>
+
+</body>
+</html>
